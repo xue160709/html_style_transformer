@@ -4,9 +4,11 @@ import Image from 'next/image';
 
 export default function ContactPanel() {
   const [isOpen, setIsOpen] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
   const panelRef = useRef(null);
 
   useEffect(() => {
+    setIsMounted(true);
     // 添加全局点击事件监听器
     const handleClickOutside = (event) => {
       if (panelRef.current && !panelRef.current.contains(event.target)) {
@@ -14,11 +16,17 @@ export default function ContactPanel() {
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    if (typeof window !== 'undefined') {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
   }, []);
+
+  if (!isMounted) {
+    return null;
+  }
 
   return (
     <div ref={panelRef} className="fixed bottom-6 right-6 z-50">
@@ -34,7 +42,7 @@ export default function ContactPanel() {
       </button>
 
       {/* 二维码面板 */}
-      <div className={`absolute bottom-16 right-0 bg-white rounded-lg shadow-xl p-4 transition-all duration-200 w-[340px] ${
+      <div className={`absolute bottom-16 right-0 w-[320px] bg-white rounded-lg shadow-lg p-4 transition-all duration-300 ${
         isOpen ? 'opacity-100 visible transform translate-y-0' : 'opacity-0 invisible transform translate-y-2'
       }`}>
         <p className="text-base text-gray-700 mb-0">

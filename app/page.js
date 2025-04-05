@@ -13,6 +13,21 @@ export default function Home() {
   const [isMobile, setIsMobile] = useState(false);
   
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const handleResize = () => {
+        setIsMobile(window.innerWidth <= 768);
+      };
+      
+      handleResize(); // 初始化
+      window.addEventListener('resize', handleResize);
+      
+      return () => {
+        window.removeEventListener('resize', handleResize);
+      };
+    }
+  }, []);
+  
+  useEffect(() => {
     // 加载默认的Markdown内容
     fetch('/md/1.md')
       .then(response => response.text())
@@ -23,19 +38,6 @@ export default function Home() {
         console.error('加载Markdown文件失败:', error);
         setMarkdown('# 加载失败\n\n请重试...');
       });
-  }, []);
-  
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth <= 768);
-    };
-    
-    handleResize(); // 初始化
-    window.addEventListener('resize', handleResize);
-    
-    return () => {
-      window.removeEventListener('resize', handleResize);
-    };
   }, []);
   
   const handleContentChange = (e) => {

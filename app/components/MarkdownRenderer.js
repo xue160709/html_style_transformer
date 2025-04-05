@@ -1,5 +1,5 @@
 'use client';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import remarkGfm from 'remark-gfm';
@@ -11,15 +11,20 @@ import html2canvas from 'html2canvas';
 
 export default function MarkdownRenderer({ content }) {
   const [currentTheme, setCurrentTheme] = useState('wabisabi');
+  const [isMounted, setIsMounted] = useState(false);
   const markdownRef = useRef(null);
   const [showToast, setShowToast] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const preprocessMarkdown = (text) => {
     return text.replace(/\*\*[^*]+\*\*(?![.,!?;:，。！？；：])/g, match => match + ' ');
   };
 
   const copyHtmlToClipboard = async () => {
-    if (!markdownRef.current) return;
+    if (!markdownRef.current || !isMounted) return;
     
     // 获取当前主题的样式配置
     const currentThemeConfig = themes[currentTheme];
@@ -73,19 +78,20 @@ export default function MarkdownRenderer({ content }) {
     }
 
     try {
-      const type = 'text/html';
-      const blob = new Blob([tempElement.outerHTML], { type });
-      const data = [new ClipboardItem({ [type]: blob })];
-      await navigator.clipboard.write(data);
-      
-      setShowToast(true);
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        const type = 'text/html';
+        const blob = new Blob([tempElement.outerHTML], { type });
+        const data = [new ClipboardItem({ [type]: blob })];
+        await navigator.clipboard.write(data);
+        setShowToast(true);
+      }
     } catch (err) {
       console.error('复制失败:', err);
     }
   };
 
   const downloadAsImage = async () => {
-    if (!markdownRef.current) return;
+    if (!markdownRef.current || !isMounted) return;
     
     try {
       const element = markdownRef.current;
@@ -111,7 +117,7 @@ export default function MarkdownRenderer({ content }) {
         scale: 2,
         useCORS: true, // 允许跨域图片
         backgroundColor: '#ffffff',
-        logging: true, // 开启调试日志
+        logging: false, // 关闭调试日志
         onclone: (clonedDoc) => {
           // 确保克隆的文档中的样式被正确应用
           const clonedElement = clonedDoc.querySelector('.markdown-body');
@@ -127,19 +133,23 @@ export default function MarkdownRenderer({ content }) {
       element.style.backgroundColor = '';
       element.style.padding = '';
       
-      const image = canvas.toDataURL('image/png', 1.0);
-      const link = document.createElement('a');
-      link.href = image;
-      link.download = 'markdown-content.png';
-      link.click();
-      
-      setShowToast(true);
-      setTimeout(() => setShowToast(false), 3000);
+      if (typeof window !== 'undefined') {
+        const image = canvas.toDataURL('image/png', 1.0);
+        const link = document.createElement('a');
+        link.href = image;
+        link.download = 'markdown-content.png';
+        link.click();
+        
+        setShowToast(true);
+      }
     } catch (err) {
-      console.error('生成图片失败:', err);
-      alert('生成图片失败，请稍后重试');
+      console.error('导出图片失败:', err);
     }
   };
+
+  if (!isMounted) {
+    return null;
+  }
 
   return (
     <>
