@@ -1,175 +1,148 @@
 'use client';
 import { useState, useEffect } from 'react';
-import TurndownService from 'turndown';
 import MarkdownRenderer from './components/MarkdownRenderer';
-import { Textarea } from "@/components/ui/textarea"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Separator } from "@/components/ui/separator"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs"
-import { Button } from "@/components/ui/button"
-import { Settings } from 'lucide-react';
 import SettingsPanel from './components/SettingsPanel';
+import { Menu } from 'lucide-react';
+import { Button } from "@/components/ui/button";
+import { Resizable } from 're-resizable';
 
-// 将 MainContent 组件移到外部
-function MainContent({ markdown, handleContentChange, handlePaste, isMobile, currentTheme }) {
-  return (
-    <div className={`${isMobile ? 'flex-1' : 'flex h-[calc(100vh-64px)]'}`}>
-      {isMobile ? (
-        <Tabs defaultValue="edit" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="edit">编辑</TabsTrigger>
-            <TabsTrigger value="preview">预览</TabsTrigger>
-          </TabsList>
-          <TabsContent value="edit" className="h-[calc(100vh-120px)]">
-            <ScrollArea className="h-full">
-              <Textarea
-                className="w-full resize-none min-h-[calc(100vh-120px)]"
-                value={markdown}
-                onChange={handleContentChange}
-                onPaste={handlePaste}
-                placeholder="在这里粘贴 Markdown 或富文本内容..."
-              />
-            </ScrollArea>
-          </TabsContent>
-          <TabsContent value="preview" className="h-[calc(100vh-120px)]">
-            <ScrollArea className="h-full w-full">
-              <div className="prose dark:prose-invert w-full max-w-none">
-                <MarkdownRenderer content={markdown} isMobile={isMobile} currentTheme={currentTheme} />
-              </div>
-            </ScrollArea>
-          </TabsContent>
-        </Tabs>
-      ) : (
-        <>
-          {/* 左侧编辑区 */}
-          <div className="w-[40%] p-4 overflow-hidden">
-            <ScrollArea className="h-full">
-              <Textarea
-                className="w-full resize-none min-h-[calc(100vh-120px)]"
-                value={markdown}
-                onChange={handleContentChange}
-                onPaste={handlePaste}
-                placeholder="在这里粘贴 Markdown 或富文本内容..."
-              />
-            </ScrollArea>
-          </div>
-          
-          <Separator orientation="vertical" />
-          
-          {/* 右侧预览区 */}
-          <div className="w-[60%] p-4 overflow-hidden">
-            <ScrollArea className="h-full w-full">
-              <div className="prose dark:prose-invert w-full max-w-none">
-                <MarkdownRenderer content={markdown} isMobile={isMobile} currentTheme={currentTheme} />
-              </div>
-            </ScrollArea>
-          </div>
-        </>
-      )}
-    </div>
-  );
+// 默认的Markdown内容
+const DefaultContent = `# Markdown 样式转换器
+
+这是一个简单的**Markdown样式转换器**，你可以：
+
+- 编辑左侧的Markdown内容
+- 在右侧查看实时渲染结果
+- 使用设置面板自定义样式
+
+## 支持的功能
+
+1. 实时预览
+2. 多种主题切换
+3. 自定义背景、卡片样式
+4. 添加页眉和页脚
+5. 导出为图片或HTML
+
+> 这是一个引用，可以用来强调重要内容
+
+\`\`\`javascript
+// 这是一段代码
+function hello() {
+  console.log("Hello, Markdown!");
 }
+\`\`\`
+
+![示例图片](https://images.unsplash.com/photo-1604580864964-0462f5d5b1a8?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80)
+
+祝您使用愉快！
+`;
 
 export default function Home() {
-  const [markdown, setMarkdown] = useState('');
-  const turndownService = new TurndownService();
-  const [isMobile, setIsMobile] = useState(false);
+  const [content, setContent] = useState(DefaultContent);
   const [currentTheme, setCurrentTheme] = useState('wabisabi');
-  const [showSettings, setShowSettings] = useState(false);
-  
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const handleResize = () => {
-        setIsMobile(window.innerWidth <= 768);
-      };
-      
-      handleResize(); // 初始化
-      window.addEventListener('resize', handleResize);
-      
-      return () => {
-        window.removeEventListener('resize', handleResize);
-      };
-    }
-  }, []);
-  
-  useEffect(() => {
-    // 加载默认的Markdown内容
-    fetch('/md/1.md')
-      .then(response => response.text())
-      .then(content => {
-        setMarkdown(content);
-      })
-      .catch(error => {
-        console.error('加载Markdown文件失败:', error);
-        setMarkdown('# 加载失败\n\n请重试...');
-      });
-  }, []);
-  
-  const handleContentChange = (e) => {
-    setMarkdown(e.target.value);
-  };
-  
-  const handlePaste = (e) => {
-    const textarea = e.target;
-    const isAllSelected = 
-      textarea.selectionStart === 0 && 
-      textarea.selectionEnd === textarea.value.length;
-    const isEmpty = textarea.value.length === 0;
+  const [showSettingsPanel, setShowSettingsPanel] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [markdownStyle, setMarkdownStyle] = useState(null);
 
-    if (isAllSelected || isEmpty) {
-      e.preventDefault();
-      const clipboardData = e.clipboardData || window.clipboardData;
-      const htmlContent = clipboardData.getData('text/html');
-      
-      if (htmlContent) {
-        const markdownContent = turndownService.turndown(htmlContent);
-        setMarkdown(markdownContent);
-      } else {
-        const textContent = clipboardData.getData('text/plain');
-        setMarkdown(textContent);
-      }
-    }
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    // 初始检查
+    checkMobile();
+    
+    // 添加窗口大小变化监听
+    window.addEventListener('resize', checkMobile);
+    
+    // 清理监听
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  const handleContentChange = (e) => {
+    setContent(e.target.value);
   };
 
   return (
-    <div className="flex flex-col h-screen">
-      {/* 顶部栏 */}
-      <div className="h-16 px-4 flex items-center justify-between border-b sticky top-0 z-50 bg-white dark:bg-gray-800">
-        <h1 className="text-lg font-semibold">Markdown 编辑器</h1>
-        {isMobile && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setShowSettings(true)}
+    <main className="flex min-h-screen flex-col">
+      <header className="bg-background border-b p-4">
+        <div className="container flex justify-between items-center">
+          <h1 className="text-xl font-semibold">Markdown 样式转换器</h1>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => setShowSettingsPanel(!showSettingsPanel)}
           >
-            <Settings className="h-5 w-5" />
+            <Menu className="h-5 w-5" />
           </Button>
-        )}
-      </div>
-      
-      <div className="flex flex-1 relative">
-        <div className={`flex-1 ${!isMobile && 'mr-[240px]'}`}>
-          <MainContent
-            markdown={markdown}
-            handleContentChange={handleContentChange}
-            handlePaste={handlePaste}
-            isMobile={isMobile}
-            currentTheme={currentTheme}
-          />
         </div>
-        
-        {/* 设置面板 */}
-        {(isMobile ? showSettings : true) && (
-          <div className={`${isMobile ? '' : 'fixed right-0 top-16 bottom-0 w-[240px] border-l bg-background'}`}>
-            <SettingsPanel
-              currentTheme={currentTheme}
-              setCurrentTheme={setCurrentTheme}
-              onClose={() => setShowSettings(false)}
-              isMobile={isMobile}
+      </header>
+
+      <div className="flex flex-1 overflow-hidden">
+        {!isMobile && (
+          <Resizable
+            defaultSize={{ width: '40%', height: '100%' }}
+            minWidth="30%"
+            maxWidth="70%"
+            enable={{ right: true }}
+            className="border-r h-full overflow-auto bg-muted/20"
+          >
+            <div className="h-full">
+              <textarea
+                className="w-full h-full p-4 resize-none focus:outline-none bg-transparent"
+                value={content}
+                onChange={handleContentChange}
+                placeholder="输入 Markdown 内容..."
+              />
+            </div>
+          </Resizable>
+        )}
+
+        <div className={`flex-1 h-full overflow-auto relative ${isMobile ? 'w-full' : ''}`}>
+          {isMobile && (
+            <div className="p-4 bg-muted/20 border-b">
+              <textarea
+                className="w-full p-4 resize-none focus:outline-none bg-transparent border rounded-md"
+                value={content}
+                onChange={handleContentChange}
+                placeholder="输入 Markdown 内容..."
+                rows={6}
+              />
+            </div>
+          )}
+
+          <div className="h-full">
+            <MarkdownRenderer 
+              content={content} 
+              isMobile={isMobile} 
+              currentTheme={currentTheme} 
+              markdownStyle={markdownStyle}
+            />
+          </div>
+        </div>
+
+        {showSettingsPanel && (
+          <div className="w-[300px] border-l h-full bg-background shrink-0">
+            <SettingsPanel 
+              currentTheme={currentTheme} 
+              setCurrentTheme={setCurrentTheme} 
+              onClose={() => setShowSettingsPanel(false)} 
+              isMobile={isMobile} 
+              setMarkdownStyle={setMarkdownStyle}
             />
           </div>
         )}
+
+        {isMobile && showSettingsPanel && (
+          <SettingsPanel 
+            currentTheme={currentTheme} 
+            setCurrentTheme={setCurrentTheme} 
+            onClose={() => setShowSettingsPanel(false)} 
+            isMobile={isMobile}
+            setMarkdownStyle={setMarkdownStyle}
+          />
+        )}
       </div>
-    </div>
+    </main>
   );
 }
