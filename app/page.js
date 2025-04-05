@@ -5,12 +5,77 @@ import MarkdownRenderer from './components/MarkdownRenderer';
 import { Textarea } from "@/components/ui/textarea"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
-import ContactPanel from './components/ContactPanel';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs"
+import { Button } from "@/components/ui/button"
+import { Settings } from 'lucide-react';
+import SettingsPanel from './components/SettingsPanel';
+
+// 将 MainContent 组件移到外部
+function MainContent({ markdown, handleContentChange, handlePaste, isMobile, currentTheme }) {
+  return (
+    <div className={`${isMobile ? 'flex-1' : 'flex h-[calc(100vh-64px)]'}`}>
+      {isMobile ? (
+        <Tabs defaultValue="edit" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="edit">编辑</TabsTrigger>
+            <TabsTrigger value="preview">预览</TabsTrigger>
+          </TabsList>
+          <TabsContent value="edit" className="h-[calc(100vh-120px)]">
+            <ScrollArea className="h-full">
+              <Textarea
+                className="w-full resize-none min-h-[calc(100vh-120px)]"
+                value={markdown}
+                onChange={handleContentChange}
+                onPaste={handlePaste}
+                placeholder="在这里粘贴 Markdown 或富文本内容..."
+              />
+            </ScrollArea>
+          </TabsContent>
+          <TabsContent value="preview" className="h-[calc(100vh-120px)]">
+            <ScrollArea className="h-full w-full">
+              <div className="prose dark:prose-invert w-full max-w-none">
+                <MarkdownRenderer content={markdown} isMobile={isMobile} currentTheme={currentTheme} />
+              </div>
+            </ScrollArea>
+          </TabsContent>
+        </Tabs>
+      ) : (
+        <>
+          {/* 左侧编辑区 */}
+          <div className="w-[40%] p-4 overflow-hidden">
+            <ScrollArea className="h-full">
+              <Textarea
+                className="w-full resize-none min-h-[calc(100vh-120px)]"
+                value={markdown}
+                onChange={handleContentChange}
+                onPaste={handlePaste}
+                placeholder="在这里粘贴 Markdown 或富文本内容..."
+              />
+            </ScrollArea>
+          </div>
+          
+          <Separator orientation="vertical" />
+          
+          {/* 右侧预览区 */}
+          <div className="w-[60%] p-4 overflow-hidden">
+            <ScrollArea className="h-full w-full">
+              <div className="prose dark:prose-invert w-full max-w-none">
+                <MarkdownRenderer content={markdown} isMobile={isMobile} currentTheme={currentTheme} />
+              </div>
+            </ScrollArea>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 export default function Home() {
   const [markdown, setMarkdown] = useState('');
   const turndownService = new TurndownService();
   const [isMobile, setIsMobile] = useState(false);
+  const [currentTheme, setCurrentTheme] = useState('wabisabi');
+  const [showSettings, setShowSettings] = useState(false);
   
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -51,7 +116,6 @@ export default function Home() {
       textarea.selectionEnd === textarea.value.length;
     const isEmpty = textarea.value.length === 0;
 
-    // 在全选或输入框为空的情况下执行自定义粘贴逻辑
     if (isAllSelected || isEmpty) {
       e.preventDefault();
       const clipboardData = e.clipboardData || window.clipboardData;
@@ -65,39 +129,47 @@ export default function Home() {
         setMarkdown(textContent);
       }
     }
-    // 如果不是全选且不为空，则使用默认的粘贴行为
   };
 
   return (
-    <div className={`${isMobile ? 'flex flex-col' : 'flex'} h-screen`}>
-      {/* 左侧编辑区 */}
-      <div className={`${isMobile ? 'w-full' : 'w-[40%]'} p-4 overflow-hidden`}>
-        <ScrollArea className={`${isMobile ? 'h-[600px]' : 'h-full'}`}>
-          <Textarea
-            className="w-full resize-none"
-            style={{ minHeight: isMobile ? '550px' : '90vh' }}
-            value={markdown}
-            onChange={handleContentChange}
-            onPaste={handlePaste}
-            placeholder="在这里粘贴 Markdown 或富文本内容..."
+    <div className="flex flex-col h-screen">
+      {/* 顶部栏 */}
+      <div className="h-16 px-4 flex items-center justify-between border-b sticky top-0 z-50 bg-white dark:bg-gray-800">
+        <h1 className="text-lg font-semibold">Markdown 编辑器</h1>
+        {isMobile && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowSettings(true)}
+          >
+            <Settings className="h-5 w-5" />
+          </Button>
+        )}
+      </div>
+      
+      <div className="flex flex-1 relative">
+        <div className={`flex-1 ${!isMobile && 'mr-[240px]'}`}>
+          <MainContent
+            markdown={markdown}
+            handleContentChange={handleContentChange}
+            handlePaste={handlePaste}
+            isMobile={isMobile}
+            currentTheme={currentTheme}
           />
-        </ScrollArea>
-      </div>
-      
-      {!isMobile && <Separator orientation="vertical" />}
-      {isMobile && <Separator className="my-4" />}
-      
-      {/* 右侧预览区 */}
-      <div className={`${isMobile ? 'w-full flex-1' : 'w-[60%]'} p-4 overflow-hidden`}>
-        <ScrollArea className="h-full w-full">
-          <div className="prose dark:prose-invert w-full max-w-none">
-            <MarkdownRenderer content={markdown} isMobile={isMobile} />
+        </div>
+        
+        {/* 设置面板 */}
+        {(isMobile ? showSettings : true) && (
+          <div className={`${isMobile ? '' : 'fixed right-0 top-16 bottom-0 w-[240px] border-l bg-background'}`}>
+            <SettingsPanel
+              currentTheme={currentTheme}
+              setCurrentTheme={setCurrentTheme}
+              onClose={() => setShowSettings(false)}
+              isMobile={isMobile}
+            />
           </div>
-        </ScrollArea>
+        )}
       </div>
-      
-      {/* 添加联系面板组件 */}
-      {/* <ContactPanel /> */}
     </div>
   );
 }
