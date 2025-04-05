@@ -69,12 +69,13 @@ export default function Home() {
   };
 
   return (
-    <div className="flex h-screen">
+    <div className={`${isMobile ? 'flex flex-col' : 'flex'} h-screen`}>
       {/* 左侧编辑区 */}
-      <div className="w-1/2 p-4 overflow-hidden">
-        <ScrollArea className="h-full">
+      <div className={`${isMobile ? 'w-full' : 'w-[40%]'} p-4 overflow-hidden`}>
+        <ScrollArea className={`${isMobile ? 'h-[600px]' : 'h-full'}`}>
           <Textarea
-            className="min-h-[90vh] w-full resize-none"
+            className="w-full resize-none"
+            style={{ minHeight: isMobile ? '550px' : '90vh' }}
             value={markdown}
             onChange={handleContentChange}
             onPaste={handlePaste}
@@ -83,10 +84,11 @@ export default function Home() {
         </ScrollArea>
       </div>
       
-      <Separator orientation="vertical" />
+      {!isMobile && <Separator orientation="vertical" />}
+      {isMobile && <Separator className="my-4" />}
       
       {/* 右侧预览区 */}
-      <div className="w-1/2 p-4 overflow-hidden">
+      <div className={`${isMobile ? 'w-full flex-1' : 'w-[60%]'} p-4 overflow-hidden`}>
         <ScrollArea className="h-full w-full">
           <div className="prose dark:prose-invert w-full max-w-none">
             <MarkdownRenderer content={markdown} isMobile={isMobile} />
@@ -95,7 +97,7 @@ export default function Home() {
       </div>
       
       {/* 添加联系面板组件 */}
-      <ContactPanel />
+      {/* <ContactPanel /> */}
     </div>
   );
 }

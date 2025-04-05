@@ -5,15 +5,18 @@ import rehypeRaw from 'rehype-raw';
 import remarkGfm from 'remark-gfm';
 import { themes } from '../styles/markdownThemes';
 import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { ToastProvider, ToastViewport, Toast, ToastTitle, ToastDescription, ToastClose, ToastAction } from "@/components/ui/toast"
+import { ToastProvider, ToastViewport, Toast, ToastTitle, ToastDescription } from "@/components/ui/toast"
+import { ChevronRight, Settings, Download, Copy, Image, Sun, Moon } from 'lucide-react';
 import html2canvas from 'html2canvas';
 
-export default function MarkdownRenderer({ content }) {
+export default function MarkdownRenderer({ content, isMobile }) {
   const [currentTheme, setCurrentTheme] = useState('wabisabi');
   const [isMounted, setIsMounted] = useState(false);
-  const markdownRef = useRef(null);
+  const [showWorkspace, setShowWorkspace] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
+  const markdownRef = useRef(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -90,6 +93,87 @@ export default function MarkdownRenderer({ content }) {
     }
   };
 
+  const copyAsImage = async () => {
+    if (!markdownRef.current || !isMounted) return;
+    
+    try {
+      // 确保文档有焦点
+      if (!document.hasFocus()) {
+        document.body.focus();
+      }
+      
+      const element = markdownRef.current;
+      
+      // 等待所有图片加载完成
+      const images = element.getElementsByTagName('img');
+      const imagePromises = Array.from(images).map(img => {
+        if (img.complete) return Promise.resolve();
+        return new Promise((resolve) => {
+          img.onload = resolve;
+          img.onerror = resolve;
+        });
+      });
+      
+      await Promise.all(imagePromises);
+      
+      // 添加临时样式
+      element.style.backgroundColor = 'white';
+      element.style.padding = '20px';
+      
+      const canvas = await html2canvas(element, {
+        width: 1080,
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+        onclone: (clonedDoc) => {
+          const clonedElement = clonedDoc.querySelector('.markdown-body');
+          if (clonedElement) {
+            clonedElement.style.width = '1080px';
+            clonedElement.style.backgroundColor = 'white';
+            clonedElement.style.padding = '20px';
+          }
+        }
+      });
+      
+      // 恢复原始样式
+      element.style.backgroundColor = '';
+      element.style.padding = '';
+
+      try {
+        // 尝试使用新的 Clipboard API
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            'image/png': blob
+          })
+        ]);
+        setToastMessage('图片已复制到剪贴板');
+      } catch (clipboardError) {
+        // 如果 Clipboard API 失败，提供备选方案：打开新窗口让用户手动复制
+        const imageUrl = canvas.toDataURL('image/png');
+        const newWindow = window.open();
+        if (newWindow) {
+          newWindow.document.write(`
+            <img src="${imageUrl}" style="max-width: 100%;" />
+            <div style="margin-top: 10px; text-align: center;">
+              <p>请右键点击图片并选择"复制图片"</p>
+            </div>
+          `);
+          setToastMessage('请在新窗口中右键复制图片');
+        } else {
+          throw new Error('无法打开新窗口，请检查是否被浏览器拦截');
+        }
+      }
+      
+      setShowToast(true);
+    } catch (err) {
+      console.error('复制图片失败:', err);
+      setToastMessage(err.message || '复制图片失败，请重试');
+      setShowToast(true);
+    }
+  };
+
   const downloadAsImage = async () => {
     if (!markdownRef.current || !isMounted) return;
     
@@ -152,104 +236,193 @@ export default function MarkdownRenderer({ content }) {
   }
 
   return (
-    <>
-      <Card className="p-4">
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex gap-2">
-            {Object.entries(themes).map(([themeKey, theme]) => (
-              <Button
-                key={themeKey}
-                variant={currentTheme === themeKey ? "default" : "outline"}
-                onClick={() => setCurrentTheme(themeKey)}
-                size="sm"
-              >
-                {theme.name}
-              </Button>
-            ))}
+    <div className="relative w-full h-full">
+      {/* 预览区域 */}
+      <div className="h-full">
+        {/* 顶部工具栏 */}
+        <div className="h-14 border-b flex items-center justify-between px-4 bg-white dark:bg-gray-800">
+          <div className="flex items-center space-x-2">
+            <h1 className="text-lg font-semibold">预览</h1>
           </div>
-          
-          <div className="flex gap-2">
+          <div className="flex items-center space-x-2">
             <Button
-              variant="default"
-              onClick={downloadAsImage}
-              size="sm"
-              className="bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white shadow-md transition-all duration-200 hover:shadow-lg"
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsDarkMode(!isDarkMode)}
             >
-              下载图片
+              {isDarkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
             </Button>
             <Button
-              variant="default"
-              onClick={copyHtmlToClipboard}
-              size="sm"
-              className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white shadow-md transition-all duration-200 hover:shadow-lg"
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowWorkspace(!showWorkspace)}
             >
-              复制富文本
+              <Settings className="h-5 w-5" />
             </Button>
           </div>
         </div>
 
-        <div 
-          ref={markdownRef}
-          className="markdown-container"
-        >
-          <ReactMarkdown 
-            rehypePlugins={[rehypeRaw]} 
-            remarkPlugins={[remarkGfm]}
-            className={`markdown-body ${currentTheme}`}
-            components={{
-              h1: ({node, ...props}) => <h1 className="markdown-h1" {...props} />,
-              h2: ({node, ...props}) => <h2 className="markdown-h2" {...props} />,
-              h3: ({node, ...props}) => <h3 className="markdown-h3" {...props} />,
-              h4: ({node, ...props}) => <h4 className="markdown-h4" {...props} />,
-              h5: ({node, ...props}) => <h5 className="markdown-h5" {...props} />,
-              h6: ({node, ...props}) => <h6 className="markdown-h6" {...props} />,
-              li: ({node, ...props}) => <li className="markdown-li" {...props} />,
-              img: ({node, ...props}) => (
-                <img 
-                  className="max-w-full h-auto" 
-                  {...props} 
-                  crossOrigin="anonymous" // 添加跨域支持
-                  loading="eager" // 立即加载图片
-                  style={{ 
-                    maxWidth: '100%',
-                    display: 'block', // 确保图片正确显示
-                    margin: '1em 0' 
-                  }}
-                />
-              ),
-            }}
+        {/* Markdown 预览内容 */}
+        <div className="h-[calc(100%-3.5rem)] overflow-auto">
+          <div ref={markdownRef} className="markdown-container">
+            <ReactMarkdown
+              rehypePlugins={[rehypeRaw]}
+              remarkPlugins={[remarkGfm]}
+              className={`markdown-body ${currentTheme}`}
+              components={{
+                h1: ({node, ...props}) => <h1 className="markdown-h1" {...props} />,
+                h2: ({node, ...props}) => <h2 className="markdown-h2" {...props} />,
+                h3: ({node, ...props}) => <h3 className="markdown-h3" {...props} />,
+                h4: ({node, ...props}) => <h4 className="markdown-h4" {...props} />,
+                h5: ({node, ...props}) => <h5 className="markdown-h5" {...props} />,
+                h6: ({node, ...props}) => <h6 className="markdown-h6" {...props} />,
+                li: ({node, ...props}) => <li className="markdown-li" {...props} />,
+                img: ({node, ...props}) => (
+                  <img
+                    className="max-w-full h-auto"
+                    {...props}
+                    crossOrigin="anonymous"
+                    loading="eager"
+                    style={{
+                      maxWidth: '100%',
+                      display: 'block',
+                      margin: '1em 0'
+                    }}
+                  />
+                ),
+              }}
+            >
+              {preprocessMarkdown(content)}
+            </ReactMarkdown>
+          </div>
+        </div>
+      </div>
+
+      {/* 工作区侧边栏 */}
+      <div
+        className={`fixed ${isMobile ? 'inset-x-0 bottom-0 h-[80vh] rounded-t-xl' : 'right-0 top-0 h-full w-[320px]'} 
+        bg-white dark:bg-gray-800 border-l transform transition-transform duration-300 
+        ${showWorkspace ? 'translate-y-0' : isMobile ? 'translate-y-full' : 'translate-x-full'} z-50`}
+      >
+        <div className="h-14 border-b flex items-center justify-between px-4">
+          <h2 className="font-semibold">设置</h2>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowWorkspace(false)}
           >
-            {preprocessMarkdown(content)}
-          </ReactMarkdown>
+            <ChevronRight className="h-5 w-5" />
+          </Button>
         </div>
 
-        <style jsx global>{`
-          ${themes[currentTheme].styles}
-          .markdown-container {
-            width: 100%;
-            max-width: 100%;
-            overflow: hidden;
-          }
-          .markdown-body {
-            width: 100%;
-            overflow-wrap: break-word;
-          }
-          .markdown-body img {
-            max-width: 100%;
-            height: auto;
-          }
-        `}</style>
-      </Card>
-      
+        <div className="p-4 space-y-6 overflow-auto" style={{ height: 'calc(100% - 3.5rem)' }}>
+          {/* 主题选择 */}
+          <div className="space-y-2">
+            <h3 className="font-medium">主题</h3>
+            <div className="grid grid-cols-2 gap-2">
+              {Object.entries(themes).map(([themeKey, theme]) => (
+                <Button
+                  key={themeKey}
+                  variant={currentTheme === themeKey ? "default" : "outline"}
+                  onClick={() => setCurrentTheme(themeKey)}
+                  size="sm"
+                  className="w-full"
+                >
+                  {theme.name}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          {/* 操作按钮 */}
+          <div className="space-y-2">
+            <h3 className="font-medium">操作</h3>
+            <div className="space-y-2">
+              <Button
+                variant="outline"
+                onClick={copyAsImage}
+                className="w-full flex items-center gap-2"
+              >
+                <Image className="h-4 w-4" />
+                复制图片
+              </Button>
+              <Button
+                variant="outline"
+                onClick={downloadAsImage}
+                className="w-full flex items-center gap-2"
+              >
+                <Download className="h-4 w-4" />
+                下载图片
+              </Button>
+              <Button
+                variant="outline"
+                onClick={copyHtmlToClipboard}
+                className="w-full flex items-center gap-2"
+              >
+                <Copy className="h-4 w-4" />
+                复制富文本
+              </Button>
+            </div>
+          </div>
+
+          {/* 其他设置选项 */}
+          <div className="space-y-2">
+            <h3 className="font-medium">图片设置</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm mb-1">宽度</label>
+                <input
+                  type="number"
+                  className="w-full px-3 py-2 border rounded-md dark:bg-gray-700"
+                  defaultValue="440"
+                />
+              </div>
+              <div>
+                <label className="block text-sm mb-1">高度</label>
+                <input
+                  type="number"
+                  className="w-full px-3 py-2 border rounded-md dark:bg-gray-700"
+                  defaultValue="586"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Toast提示 */}
       <ToastProvider>
         <Toast open={showToast} onOpenChange={setShowToast}>
-          <ToastTitle>操作成功</ToastTitle>
-          <ToastDescription>
-            {showToast === 'copy' ? '内容已复制到剪贴板' : '图片已成功下载'}
-          </ToastDescription>
+          <ToastTitle>操作提示</ToastTitle>
+          <ToastDescription>{toastMessage}</ToastDescription>
         </Toast>
         <ToastViewport />
       </ToastProvider>
-    </>
+
+      <style jsx global>{`
+        ${themes[currentTheme].styles}
+        .markdown-container {
+          width: 100%;
+          max-width: 100%;
+          overflow: hidden;
+          padding: 20px;
+        }
+        .markdown-body {
+          width: 100%;
+          overflow-wrap: break-word;
+          color: ${isDarkMode ? '#ffffff' : themes[currentTheme].textColor || '#2c3e50'};
+          background: ${isDarkMode ? 'transparent' : themes[currentTheme].background || '#ffffff'};
+        }
+        .markdown-body img {
+          max-width: 100%;
+          height: auto;
+        }
+        @media (max-width: 768px) {
+          .markdown-container {
+            padding: 16px;
+          }
+        }
+      `}</style>
+    </div>
   );
 } 
