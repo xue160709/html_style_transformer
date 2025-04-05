@@ -4,6 +4,7 @@ import MarkdownRenderer from './components/MarkdownRenderer';
 import SettingsPanel from './components/SettingsPanel';
 import { Menu } from 'lucide-react';
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Resizable } from 're-resizable';
 
 // 默认的Markdown内容
@@ -64,8 +65,8 @@ export default function Home() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col">
-      <header className="bg-background border-b p-4">
+    <main className="flex h-screen flex-col">
+      <header className="bg-background border-b p-4 flex-shrink-0">
         <div className="container flex justify-between items-center">
           <h1 className="text-xl font-semibold">Markdown 样式转换器</h1>
           <Button 
@@ -85,40 +86,52 @@ export default function Home() {
             minWidth="30%"
             maxWidth="70%"
             enable={{ right: true }}
-            className="border-r h-full overflow-auto bg-muted/20"
+            className="border-r bg-background shadow-inner flex"
           >
-            <div className="h-full">
-              <textarea
-                className="w-full h-full p-4 resize-none focus:outline-none bg-transparent"
-                value={content}
-                onChange={handleContentChange}
-                placeholder="输入 Markdown 内容..."
-              />
-            </div>
+            <textarea
+              className="w-full p-6 resize-none focus:outline-none bg-background/50 font-mono text-[15px] leading-relaxed placeholder:text-muted-foreground/50 selection:bg-muted selection:text-foreground transition-colors duration-200"
+              value={content}
+              onChange={handleContentChange}
+              placeholder="输入 Markdown 内容..."
+              spellCheck="false"
+            />
           </Resizable>
         )}
 
         <div className={`flex-1 h-full overflow-auto relative ${isMobile ? 'w-full' : ''}`}>
-          {isMobile && (
-            <div className="p-4 bg-muted/20 border-b">
-              <textarea
-                className="w-full p-4 resize-none focus:outline-none bg-transparent border rounded-md"
-                value={content}
-                onChange={handleContentChange}
-                placeholder="输入 Markdown 内容..."
-                rows={6}
+          {isMobile ? (
+            <Tabs defaultValue="preview" className="w-full">
+              <TabsList className="w-full grid grid-cols-2">
+                <TabsTrigger value="edit">编辑器</TabsTrigger>
+                <TabsTrigger value="preview">预览</TabsTrigger>
+              </TabsList>
+              <TabsContent value="edit" className="p-4 bg-muted/20 h-[calc(100vh-8rem)]">
+                <textarea
+                  className="w-full h-full p-4 resize-none focus:outline-none bg-transparent border rounded-md"
+                  value={content}
+                  onChange={handleContentChange}
+                  placeholder="输入 Markdown 内容..."
+                />
+              </TabsContent>
+              <TabsContent value="preview" className="h-[calc(100vh-8rem)]">
+                <MarkdownRenderer 
+                  content={content} 
+                  isMobile={isMobile} 
+                  currentTheme={currentTheme} 
+                  markdownStyle={markdownStyle}
+                />
+              </TabsContent>
+            </Tabs>
+          ) : (
+            <div className="h-full">
+              <MarkdownRenderer 
+                content={content} 
+                isMobile={isMobile} 
+                currentTheme={currentTheme} 
+                markdownStyle={markdownStyle}
               />
             </div>
           )}
-
-          <div className="h-full">
-            <MarkdownRenderer 
-              content={content} 
-              isMobile={isMobile} 
-              currentTheme={currentTheme} 
-              markdownStyle={markdownStyle}
-            />
-          </div>
         </div>
 
         {showSettingsPanel && (
