@@ -1,6 +1,9 @@
 'use client';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
+import Mermaid from 'mermaid';
+import rehypeHighlight from 'rehype-highlight';
+import 'highlight.js/styles/github.css'; // 引入代码高亮样式
 import rehypeRaw from 'rehype-raw';
 import remarkGfm from 'remark-gfm';
 import { themes } from '../styles/markdownThemes';
@@ -8,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { ToastProvider, ToastViewport, Toast, ToastTitle, ToastDescription, ToastClose, ToastAction } from "@/components/ui/toast"
 import html2canvas from 'html2canvas';
+import { cn } from "@/lib/utils";
 
 export default function MarkdownRenderer({ content }) {
   const [currentTheme, setCurrentTheme] = useState('wabisabi');
@@ -15,7 +19,23 @@ export default function MarkdownRenderer({ content }) {
   const [showToast, setShowToast] = useState(false);
 
   const preprocessMarkdown = (text) => {
-    return text.replace(/\*\*[^*]+\*\*(?![.,!?;:，。！？；：])/g, match => match + ' ');
+    // 去除代码块前的缩进
+    text = text.replace(/(^|\n)(\s*)```/g, '$1```');
+    
+    // 处理加粗文本的空格
+    text = text.replace(/\*\*([^*]+)\*\*(\s*(?![.,!?;:，。！？；：\n])|(?=[.,!?;:，。！？；：\n]))/g, (match, p1, p2) => {
+      // 如果后面是标点或换行，不添加空格
+      if (p2.match(/[.,!?;:，。！？；：\n]/)) {
+        return `**${p1}**`;
+      }
+      // 否则确保只有一个空格
+      return `**${p1}** `;
+    });
+
+    // 确保列表项前有换行
+    text = text.replace(/(?<!\n)(- \*\*[^*]+\*\*[^。]*。?)/g, '\n$1');
+
+    return text;
   };
 
   const copyHtmlToClipboard = async () => {
@@ -141,6 +161,50 @@ export default function MarkdownRenderer({ content }) {
     }
   };
 
+  const getComputedColor = (variable) => {
+    const color = getComputedStyle(document.documentElement)
+      .getPropertyValue(variable)
+      .trim();
+    // 确保返回有效的颜色格式
+    return color.startsWith('hsl') ? '#666666' : color;
+  };
+
+  useEffect(() => {
+    Mermaid.initialize({
+      startOnLoad: true,
+      theme: 'neutral',
+      securityLevel: 'loose',
+      themeVariables: {
+        'primaryColor': '#1f2937',
+        'primaryTextColor': '#ffffff',
+        'primaryBorderColor': '#4b5563',
+        'lineColor': '#6b7280',
+        'secondaryColor': '#f3f4f6',
+        'tertiaryColor': '#e5e7eb'
+      }
+    });
+  }, []);
+
+  const renderMermaid = (code) => {
+    try {
+      const id = `mermaid-${Math.random().toString(36).substr(2, 9)}`;
+      // 使用 mermaidAPI.render 而不是直接调用 render
+      return new Promise((resolve, reject) => {
+        Mermaid.mermaidAPI.render(id, code)
+          .then(({ svg }) => {
+            resolve({ svg });
+          })
+          .catch(error => {
+            console.error('Mermaid 渲染错误:', error);
+            reject(error);
+          });
+      });
+    } catch (e) {
+      console.error('Mermaid 初始化错误:', e);
+      return Promise.resolve({ svg: '' });
+    }
+  };
+
   return (
     <>
       <Card className="p-4">
@@ -183,8 +247,9 @@ export default function MarkdownRenderer({ content }) {
           className="markdown-container"
         >
           <ReactMarkdown 
-            rehypePlugins={[rehypeRaw]} 
+            rehypePlugins={[rehypeRaw,rehypeHighlight]} 
             remarkPlugins={[remarkGfm]}
+            
             className={`markdown-body ${currentTheme}`}
             components={{
               h1: ({node, ...props}) => <h1 className="markdown-h1" {...props} />,
@@ -207,6 +272,47 @@ export default function MarkdownRenderer({ content }) {
                   }}
                 />
               ),
+              code: ({node, inline, className, children, ...props}) => {
+                const match = /language-(\w+)/.exec(className || '');
+                const language = match && match[1];
+                
+                if (language === 'mermaid') {
+                  const [mermaidSvg, setMermaidSvg] = useState('');
+                  
+                  useEffect(() => {
+                    renderMermaid(String(children))
+                      .then(({ svg }) => {
+                        setMermaidSvg(svg);
+                      })
+                      .catch(() => {
+                        setMermaidSvg('');
+                      });
+                  }, [children]);
+                  
+                  return mermaidSvg ? (
+                    <div className="my-4 p-4 bg-background border rounded-lg shadow-sm">
+                      <div dangerouslySetInnerHTML={{ __html: mermaidSvg }} />
+                    </div>
+                  ) : (
+                    <code className={cn(
+                      "block w-full p-4 bg-muted rounded-lg",
+                      className
+                    )} {...props}>{children}</code>
+                  );
+                }
+                return inline ? (
+                  <code className="px-1 py-0.5 bg-muted rounded text-sm" {...props}>
+                    {children}
+                  </code>
+                ) : (
+                  <code className={cn(
+                    "block w-full p-4 bg-muted rounded-lg overflow-x-auto",
+                    className
+                  )} {...props}>
+                    {children}
+                  </code>
+                );
+              },
             }}
           >
             {preprocessMarkdown(content)}
@@ -227,6 +333,9 @@ export default function MarkdownRenderer({ content }) {
           .markdown-body img {
             max-width: 100%;
             height: auto;
+          }
+          .markdown-container pre{
+            background-color: transparent;
           }
         `}</style>
       </Card>

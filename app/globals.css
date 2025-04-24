@@ -117,3 +117,20 @@ textarea {
     @apply bg-background text-foreground;
   }
 }
+
+.hljs {
+  @apply bg-transparent;
+  @apply text-foreground;
+}
+
+.hljs-keyword {
+  @apply text-primary;
+}
+
+.hljs-string {
+  @apply text-green-600 dark:text-green-400;
+}
+
+.hljs-comment {
+  @apply text-muted-foreground;
+}

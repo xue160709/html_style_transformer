@@ -49,17 +49,20 @@ export default function Home() {
       textarea.selectionEnd === textarea.value.length;
     const isEmpty = textarea.value.length === 0;
 
-    // 在全选或输入框为空的情况下执行自定义粘贴逻辑
     if (isAllSelected || isEmpty) {
       e.preventDefault();
       const clipboardData = e.clipboardData || window.clipboardData;
       const htmlContent = clipboardData.getData('text/html');
+      const textContent = clipboardData.getData('text/plain');
       
       if (htmlContent) {
-        const markdownContent = turndownService.turndown(htmlContent);
+        // 如果是 HTML 内容，转换为 Markdown
+        let markdownContent = turndownService.turndown(htmlContent);
+        // 手动处理转义字符
+        markdownContent = markdownContent.replace(/\\([`*_{}[\]()#+\-.!])/g, '$1');
         setMarkdown(markdownContent);
-      } else {
-        const textContent = clipboardData.getData('text/plain');
+      } else if (textContent) {
+        // 如果是纯文本内容，直接设置为 Markdown
         setMarkdown(textContent);
       }
     }
